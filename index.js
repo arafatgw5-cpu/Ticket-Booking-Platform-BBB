@@ -233,7 +233,15 @@ app.patch('/tickets/verify/:id', verifyJWT, verifyAdmin, async (req, res) => {
 
 
 
-
+app.get('/bookings/user/:email', verifyJWT, async (req, res) => {
+    try {
+        const email = req.params.email;
+        const bookings = await db.collection('bookings').find({ userEmail: email }).sort({ bookingDate: -1 }).toArray();
+        res.send(bookings);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch bookings', error: error.message });
+    }
+});
 
 app.get('/bookings/vendor/:email', verifyJWT, verifyVendor, async (req, res) => {
     try {
