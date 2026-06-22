@@ -321,6 +321,46 @@ app.get('/transactions/:email', verifyJWT, async (req, res) => {
 // ==========================================
 // 9. STATS APIs
 // ==========================================
+app.get('/stats/vendor/:email', verifyJWT, verifyVendor, async (req, res) => {
+    try {
+        const email = req.params.email;
+        const tickets = await db.collection('tickets').find({ vendorEmail: email }).toArray();
+        const totalAdded = tickets.length;
+
+        const ticketIds = tickets.map(t => t._id.toString());
+        const soldBookings = await db.collection('bookings').find({
+            ticketId: { $in: ticketIds },
+            status: 'paid'
+        }).toArray();
+
+        const totalSold = soldBookings.reduce((sum, b) => sum + b.quantity, 0);
+        const totalRevenue = soldBookings.reduce((sum, b) => sum + b.totalPrice, 0);
+
+        res.send({ totalAdded, totalSold, totalRevenue });
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch stats', error: error.message });
+    }
+});
+
+app.get('/stats/admin', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const totalUsers = await db.collection('users').countDocuments();
+        const totalTickets = await db.collection('tickets').countDocuments();
+        const totalBookings = await db.collection('bookings').countDocuments();
+        const totalRevenue = await db.collection('payments').aggregate([
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ]).toArray();
+
+        res.send({
+            totalUsers,
+            totalTickets,
+            totalBookings,
+            totalRevenue: totalRevenue[0]?.total || 0
+        });
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch stats', error: error.message });
+    }
+});
 
 // ==========================================
 // 9. ROOT & HEALTH CHECK
