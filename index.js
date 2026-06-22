@@ -29,3 +29,29 @@ const client = new MongoClient(process.env.MONGODB_URI, {
     serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true }
 });
 const db = client.db('ticketbari');
+const verifyJWT = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).send({ message: 'Unauthorized access' });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(401).send({ message: 'Unauthorized access' });
+        req.decoded = decoded;
+        next();
+    });
+};
+
+const verifyAdmin = async (req, res, next) => {
+    const email = req.decoded.email;
+    const user = await db.collection('users').findOne({ email });
+    if (user?.role !== 'admin') return res.status(403).send({ message: 'Forbidden access' });
+    next();
+};
+
+const verifyVendor = async (req, res, next) => {
+    const email = req.decoded.email;
+    const user = await db.collection('users').findOne({ email });
+    if (user?.role !== 'vendor' && user?.role !== 'admin') {
+        return res.status(403).send({ message: 'Forbidden access' });
+    }
+    next();
+};
