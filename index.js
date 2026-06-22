@@ -235,6 +235,56 @@ app.patch('/tickets/verify/:id', verifyJWT, verifyAdmin, async (req, res) => {
 
 
 
+app.get('/bookings/vendor/:email', verifyJWT, verifyVendor, async (req, res) => {
+    try {
+        const email = req.params.email;
+        const vendorTickets = await db.collection('tickets').find({ vendorEmail: email }).toArray();
+        const ticketIds = vendorTickets.map(t => t._id.toString());
+
+        const bookings = await db.collection('bookings').find({
+            $or: [
+                { ticketId: { $in: ticketIds } },
+                { vendorEmail: email }
+            ]
+        }).toArray();
+        res.send(bookings);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch bookings', error: error.message });
+    }
+});
+
+app.patch('/bookings/status/:id', verifyJWT, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { status } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { status } };
+        const result = await db.collection('bookings').updateOne(filter, updateDoc);
+        res.send(result);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to update booking', error: error.message });
+    }
+});
+
+// ==========================================
+// 8. PAYMENT & STRIPE APIs
+// ==========================================
+app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+    try {
+        const { price } = req.body;
+        const amount = parseInt(price * 100);
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amount,
+            currency: 'usd',
+            payment_method_types: ['card']
+        });
+        res.send({ clientSecret: paymentIntent.client_secret });
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to create payment intent', error: error.message });
+    }
+});
+
+
 
 // ==========================================
 // 9. STATS APIs
