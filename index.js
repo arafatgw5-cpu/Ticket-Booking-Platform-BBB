@@ -452,7 +452,7 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 10. SERVER START
+// 10. SERVER START AND MONGODB CONNECTION
 // ==========================================
 async function run() {
     try {
