@@ -284,7 +284,39 @@ app.post('/create-payment-intent', verifyJWT, async (req, res) => {
     }
 });
 
+app.post('/save-payment', verifyJWT, async (req, res) => {
+    try {
+        const payment = req.body;
+        payment.paymentDate = new Date();
+        const paymentResult = await db.collection('payments').insertOne(payment);
 
+        const bookingFilter = { _id: new ObjectId(payment.bookingId) };
+        const bookingUpdate = { $set: { status: 'paid' } };
+        await db.collection('bookings').updateOne(bookingFilter, bookingUpdate);
+
+        const booking = await db.collection('bookings').findOne({ _id: new ObjectId(payment.bookingId) });
+        if (booking) {
+            const ticketFilter = { _id: new ObjectId(booking.ticketId) };
+            await db.collection('tickets').updateOne(ticketFilter, {
+                $inc: { quantity: -booking.quantity }
+            });
+        }
+
+        res.send(paymentResult);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to save payment', error: error.message });
+    }
+});
+
+app.get('/transactions/:email', verifyJWT, async (req, res) => {
+    try {
+        const email = req.params.email;
+        const transactions = await db.collection('payments').find({ userEmail: email }).sort({ paymentDate: -1 }).toArray();
+        res.send(transactions);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch transactions', error: error.message });
+    }
+});
 
 // ==========================================
 // 9. STATS APIs
