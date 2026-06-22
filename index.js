@@ -224,14 +224,88 @@ app.patch('/tickets/verify/:id', verifyJWT, verifyAdmin, async (req, res) => {
     }
 });
 
+app.patch('/tickets/advertise/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { isAdvertised } = req.body;
 
+        if (isAdvertised) {
+            const advertisedCount = await db.collection('tickets').countDocuments({ isAdvertised: true });
+            if (advertisedCount >= 6) {
+                return res.status(400).send({ message: 'Maximum 6 tickets can be advertised' });
+            }
+        }
+
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { isAdvertised } };
+        const result = await db.collection('tickets').updateOne(filter, updateDoc);
+        res.send(result);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to update advertisement', error: error.message });
+    }
+});
 
 // ==========================================
 // 6. USER MANAGEMENT APIs
 // ==========================================
+app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const users = await db.collection('users').find({}).toArray();
+        res.send(users);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch users', error: error.message });
+    }
+});
 
+app.patch('/users/role/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { role } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { role } };
+        const result = await db.collection('users').updateOne(filter, updateDoc);
+        res.send(result);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to update role', error: error.message });
+    }
+});
 
+app.patch('/users/fraud/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { isFraud: true } };
+        const result = await db.collection('users').updateOne(filter, updateDoc);
 
+        if (result.modifiedCount > 0) {
+            const user = await db.collection('users').findOne({ _id: new ObjectId(id) });
+            if (user) {
+                await db.collection('tickets').updateMany(
+                    { vendorEmail: user.email },
+                    { $set: { verificationStatus: 'rejected' } }
+                );
+            }
+        }
+        res.send(result);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to mark fraud', error: error.message });
+    }
+});
+
+// ==========================================
+// 7. BOOKING APIs
+// ==========================================
+app.post('/bookings', verifyJWT, async (req, res) => {
+    try {
+        const booking = req.body;
+        booking.status = 'pending';
+        booking.bookingDate = new Date();
+        const result = await db.collection('bookings').insertOne(booking);
+        res.send(result);
+    } catch (error) {
+        res.status(500).send({ message: 'Failed to create booking', error: error.message });
+    }
+});
 
 app.get('/bookings/user/:email', verifyJWT, async (req, res) => {
     try {
