@@ -423,7 +423,7 @@ app.get('/stats/vendor/:email', verifyJWT, verifyVendor, async (req, res) => {
         res.status(500).send({ message: 'Failed to fetch stats', error: error.message });
     }
 });
-
+// Admin stats with total users, tickets, bookings, and revenue
 app.get('/stats/admin', verifyJWT, verifyAdmin, async (req, res) => {
     try {
         const totalUsers = await db.collection('users').countDocuments();
